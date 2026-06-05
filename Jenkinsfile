@@ -8,6 +8,11 @@ pipeline {
         timestamps()
     }
 
+    environment {
+        AWS_REGION = 'us-east-1'
+        ECR_REPOSITORY = 'eks-demo-app'
+    }
+
     stages {
 
         stage('Checkout') {
@@ -16,11 +21,17 @@ pipeline {
             }
         }
 
-        stage('Verify AWS Access') {
+        stage('SonarQube Analysis') {
             steps {
-                sh '''
-                aws sts get-caller-identity
-                '''
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                    sonar-scanner \
+                      -Dsonar.projectKey=eks-demo-app \
+                      -Dsonar.projectName=eks-demo-app \
+                      -Dsonar.sources=. \
+                      -Dsonar.python.version=3
+                    '''
+                }
             }
         }
 
@@ -34,8 +45,7 @@ pipeline {
                 }
 
                 sh '''
-                docker build \
-                -t eks-demo-app:${GIT_SHA} .
+                docker build -t eks-demo-app:${GIT_SHA} .
                 '''
             }
         }
@@ -48,11 +58,11 @@ pipeline {
                 --output text)
 
                 aws ecr get-login-password \
-                --region us-east-1 | \
+                --region ${AWS_REGION} | \
                 docker login \
                 --username AWS \
                 --password-stdin \
-                ${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com
+                ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
                 '''
             }
         }
@@ -64,7 +74,7 @@ pipeline {
                 --query Account \
                 --output text)
 
-                IMAGE_URI=${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/eks-demo-app
+                IMAGE_URI=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}
 
                 docker tag \
                 eks-demo-app:${GIT_SHA} \
@@ -78,10 +88,6 @@ pipeline {
     }
 
     post {
-        success {
-            echo 'Image pushed successfully'
-        }
-
         always {
             sh 'docker image prune -f || true'
         }
