@@ -21,11 +21,32 @@ pipeline {
             }
         }
 
+        stage('Debug Agent') {
+            steps {
+                sh '''
+                echo "===== DEBUG INFO ====="
+                echo "User: $(whoami)"
+                echo "Host: $(hostname)"
+                echo "Workspace: $(pwd)"
+                echo "PATH: $PATH"
+
+                which sonar-scanner || true
+
+                ls -ld /opt/sonar-scanner || true
+                ls -l /opt/sonar-scanner/bin/sonar-scanner || true
+
+                /opt/sonar-scanner/bin/sonar-scanner --version || true
+
+                echo "======================"
+                '''
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
-                    sonar-scanner \
+                    /opt/sonar-scanner/bin/sonar-scanner \
                       -Dsonar.projectKey=eks-demo-app \
                       -Dsonar.projectName=eks-demo-app \
                       -Dsonar.sources=. \
@@ -54,15 +75,15 @@ pipeline {
             steps {
                 sh '''
                 ACCOUNT_ID=$(aws sts get-caller-identity \
-                --query Account \
-                --output text)
+                  --query Account \
+                  --output text)
 
                 aws ecr get-login-password \
-                --region ${AWS_REGION} | \
+                  --region ${AWS_REGION} | \
                 docker login \
-                --username AWS \
-                --password-stdin \
-                ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                  --username AWS \
+                  --password-stdin \
+                  ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
                 '''
             }
         }
@@ -71,17 +92,17 @@ pipeline {
             steps {
                 sh '''
                 ACCOUNT_ID=$(aws sts get-caller-identity \
-                --query Account \
-                --output text)
+                  --query Account \
+                  --output text)
 
                 IMAGE_URI=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}
 
                 docker tag \
-                eks-demo-app:${GIT_SHA} \
-                ${IMAGE_URI}:${GIT_SHA}
+                  eks-demo-app:${GIT_SHA} \
+                  ${IMAGE_URI}:${GIT_SHA}
 
                 docker push \
-                ${IMAGE_URI}:${GIT_SHA}
+                  ${IMAGE_URI}:${GIT_SHA}
                 '''
             }
         }
