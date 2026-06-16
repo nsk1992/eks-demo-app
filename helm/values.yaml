@@ -1,0 +1,13 @@
+replicaCount: 2
+
+image:
+  repository: 123456789012.dkr.ecr.ap-south-1.amazonaws.com/eks-demo-app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: LoadBalancer
+  port: 80
+
+container:
+  port: 5000
